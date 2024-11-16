@@ -102,36 +102,51 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     // Carousel settings
     if (isset($_POST['add_carousel_slide'])) {
-        $upload_dir = "../uploads/carousel";
-        if (!file_exists($upload_dir)) {
-            mkdir($upload_dir, 0755, true);
-        }
+    $upload_dir = "../uploads";
+    if (!file_exists($upload_dir)) {
+        mkdir($upload_dir, 0755, true);
+    }
+    
+    // Get existing carousel data
+    $carousel_data = [
+        'titles' => json_decode($settings['carousel_titles'] ?? '[]', true),
+        'descriptions' => json_decode($settings['carousel_descriptions'] ?? '[]', true),
+        'links' => json_decode($settings['carousel_links'] ?? '[]', true),
+        'images' => json_decode($settings['carousel_images'] ?? '[]', true),
+        'statuses' => json_decode($settings['carousel_statuses'] ?? '[]', true)
+    ];
+    
+    // Add new data
+    $carousel_data['titles'][] = $_POST['carousel_title'];
+    $carousel_data['descriptions'][] = $_POST['carousel_description'];
+    $carousel_data['links'][] = $_POST['carousel_link'];
+    $carousel_data['statuses'][] = 'active';
+    
+    // Handle image upload
+    if (isset($_FILES['carousel_image']) && $_FILES['carousel_image']['error'] == 0) {
+        $file = $_FILES['carousel_image'];
+        $file_extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $new_file_name = uniqid() . "." . $file_extension;
+        $target_file = $upload_dir . "/" . $new_file_name;
         
-        $title = $conn->real_escape_string($_POST['carousel_title']);
-        $description = $conn->real_escape_string($_POST['carousel_description']);
-        $link = $conn->real_escape_string($_POST['carousel_link']);
-        
-        // Handle image upload
-        if (isset($_FILES['carousel_image']) && $_FILES['carousel_image']['error'] == 0) {
-            $file = $_FILES['carousel_image'];
-            $file_extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            $new_file_name = uniqid() . "." . $file_extension; 
-            $target_file = $upload_dir . "/" . $new_file_name;
+        if (move_uploaded_file($file['tmp_name'], $target_file)) {
+            $carousel_data['images'][] = $new_file_name;
             
-            if (move_uploaded_file($file['tmp_name'], $target_file)) {
-                $sql = "INSERT INTO carousel_images (image_path, title, description, link) 
-                        VALUES (?, ?, ?, ?)";
-                $stmt = $conn->prepare($sql);
-                $stmt->bind_param("ssss", $new_file_name, $title, $description, $link);
-                
-                if ($stmt->execute()) {
-                    $success_message = "Karusel slayd muvaffaqiyatli qo'shildi!";
-                } else {
-                    $error_message = "Xatolik yuz berdi: " . $stmt->error;
-                }
+            // Update settings
+            $settings_to_update = [
+                'carousel_titles' => json_encode($carousel_data['titles']),
+                'carousel_descriptions' => json_encode($carousel_data['descriptions']),
+                'carousel_links' => json_encode($carousel_data['links']),
+                'carousel_images' => json_encode($carousel_data['images']),
+                'carousel_statuses' => json_encode($carousel_data['statuses'])
+            ];
+            
+            if(updateSettings($conn, $settings_to_update)) {
+                $success_message = "Yangi slayd qo'shildi!";
             }
         }
     }
+}
 }
 
 // Helper function
@@ -352,97 +367,95 @@ function updateSettings($conn, $settings) {
                     </form>
                 </div>
 
-                <div class="tab-pane fade" id="carousel">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="mb-0">Yangi slayd qo'shish</h6>
-                                </div>
-                                <div class="card-body">
-                                    <form method="POST" action="" enctype="multipart/form-data">
-                                        <div class="mb-3">
-                                            <label class="form-label required">Sarlavha</label>
-                                            <input type="text" class="form-control" name="carousel_title" required>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Tavsif</label>
-                                            <textarea class="form-control" name="carousel_description" rows="2"></textarea>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Havola</label>
-                                            <input type="url" class="form-control" name="carousel_link">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label required">Rasm</label>
-                                            <input type="file" class="form-control" name="carousel_image" 
-                                                accept="image/*" required>
-                                        </div>
-                                        <button type="submit" name="add_carousel_slide" class="btn btn-primary">
-                                            Qo'shish
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
+                <!-- Carousel tab HTML qismini o'zgartirish -->
+<div class="tab-pane fade" id="carousel">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Yangi slayd qo'shish</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label required">Sarlavha</label>
+                            <input type="text" class="form-control" name="carousel_title" required>
                         </div>
-                        <div class="col-md-8">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="mb-0">Mavjud slaydlar</h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="table-responsive">
-                                        <table class="table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Rasm</th>
-                                                    <th>Sarlavha</th>
-                                                    <th>Status</th>
-                                                    <th>Tartib</th>
-                                                    <th>Amallar</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php 
-                                                $slides = $conn->query("SELECT * FROM carousel_images ORDER BY sort_order ASC");
-                                                while ($slide = $slides->fetch_assoc()): 
-                                                ?>
-                                                    <tr>
-                                                        <td>
-                                                            <img src="../uploads/carousel/<?php echo $slide['image_path']; ?>" 
-                                                                alt="Slide" style="height: 50px; object-fit: cover;">
-                                                        </td>
-                                                        <td><?php echo $slide['title']; ?></td>
-                                                        <td>
-                                                            <div class="form-check form-switch">
-                                                                <input class="form-check-input" type="checkbox" 
-                                                                    onchange="updateSlideStatus(<?php echo $slide['id']; ?>, this.checked)"
-                                                                    <?php echo $slide['status'] == 'active' ? 'checked' : ''; ?>>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <input type="number" class="form-control form-control-sm w-75" 
-                                                                value="<?php echo $slide['sort_order']; ?>"
-                                                                onchange="updateSlideOrder(<?php echo $slide['id']; ?>, this.value)">
-                                                        </td>
-                                                        <td>
-                                                            <a href="includes/edit_slide.php?id=<?php echo $slide['id']; ?>" class="btn btn-sm btn-primary">
-                                                                <i class="fas fa-edit"></i>
-                                                            </a>
-                                                            <button class="btn btn-sm btn-danger" onclick="deleteSlide(<?php echo $slide['id']; ?>)">
-                                                                <i class="fas fa-trash"></i>
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                <?php endwhile; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="mb-3">
+                            <label class="form-label">Tavsif</label>
+                            <textarea class="form-control" name="carousel_description" rows="2"></textarea>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">Havola</label>
+                            <input type="url" class="form-control" name="carousel_link">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Rasm</label>
+                            <input type="file" class="form-control" name="carousel_image" accept="image/*" required>
+                        </div>
+                        <button type="submit" name="add_carousel_slide" class="btn btn-primary">Qo'shish</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Mavjud slaydlar</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Rasm</th>
+                                    <th>Sarlavha</th>
+                                    <th>Status</th>
+                                    <th>Amallar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php 
+                                $carousel_data = [
+                                    'titles' => json_decode($settings['carousel_titles'] ?? '[]', true),
+                                    'descriptions' => json_decode($settings['carousel_descriptions'] ?? '[]', true),
+                                    'links' => json_decode($settings['carousel_links'] ?? '[]', true),
+                                    'images' => json_decode($settings['carousel_images'] ?? '[]', true),
+                                    'statuses' => json_decode($settings['carousel_statuses'] ?? '[]', true)
+                                ];
+                                foreach($carousel_data['images'] as $index => $image): 
+                                ?>
+                                    <tr>
+                                        <td>
+                                            <img src="../uploads/<?php echo $image; ?>" alt="Slide" 
+                                                 style="height: 50px; object-fit: cover;">
+                                        </td>
+                                        <td><?php echo $carousel_data['titles'][$index]; ?></td>
+                                        <td>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" 
+                                                       onchange="updateSlideStatus(<?php echo $index; ?>, this.checked)"
+                                                       <?php echo $carousel_data['statuses'][$index] == 'active' ? 'checked' : ''; ?>>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-primary" onclick="editSlide(<?php echo $index; ?>)">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-danger" onclick="deleteSlide(<?php echo $index; ?>)">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
             </div> 
         </div>
     </div>
@@ -476,19 +489,39 @@ function updateSlideOrder(slideId, newOrder) {
 }
 
 // Function to delete a slide
-function deleteSlide(slideId) {
+function deleteSlide(index) {
     if (confirm("Rostdan ham bu slaydni o'chirmoqchimisiz?")) {
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", "delete_slide.php", true);
-        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-        xhr.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-                alert(this.responseText);
+        fetch('ajax/delete_slide.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `slide_index=${index}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
                 location.reload();
             }
-        };
-        xhr.send("slide_id=" + slideId);
+        });
     }
+}
+
+function editSlide(index) {
+    // Get slide data
+    const titles = JSON.parse('<?php echo $settings["carousel_titles"]; ?>');
+    const descriptions = JSON.parse('<?php echo $settings["carousel_descriptions"]; ?>');
+    const links = JSON.parse('<?php echo $settings["carousel_links"]; ?>');
+    
+    // Fill modal form
+    document.getElementById('edit_slide_index').value = index;
+    document.getElementById('edit_title').value = titles[index];
+    document.getElementById('edit_description').value = descriptions[index];
+    document.getElementById('edit_link').value = links[index];
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('editSlideModal'));
+    modal.show();
 }
 
 // Form validation
