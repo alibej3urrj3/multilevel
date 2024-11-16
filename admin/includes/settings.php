@@ -186,6 +186,14 @@ function updateSettings($conn, $settings) {
         max-width: 200px;
         height: auto;
     }
+	.sidebar a.nav-link {
+    color: rgba(255,255,255,.8) !important;
+}
+.sidebar a.nav-link:hover, 
+.sidebar a.nav-link.active {
+    color: #fff !important;
+    background: rgba(255,255,255,.1);
+}
     </style>
 </head>
 <body>
@@ -417,37 +425,45 @@ function updateSettings($conn, $settings) {
                             <tbody>
                                 <?php 
                                 $carousel_data = [
-                                    'titles' => json_decode($settings['carousel_titles'] ?? '[]', true),
-                                    'descriptions' => json_decode($settings['carousel_descriptions'] ?? '[]', true),
-                                    'links' => json_decode($settings['carousel_links'] ?? '[]', true),
-                                    'images' => json_decode($settings['carousel_images'] ?? '[]', true),
-                                    'statuses' => json_decode($settings['carousel_statuses'] ?? '[]', true)
-                                ];
-                                foreach($carousel_data['images'] as $index => $image): 
-                                ?>
-                                    <tr>
-                                        <td>
-                                            <img src="../uploads/<?php echo $image; ?>" alt="Slide" 
-                                                 style="height: 50px; object-fit: cover;">
-                                        </td>
-                                        <td><?php echo $carousel_data['titles'][$index]; ?></td>
-                                        <td>
-                                            <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" 
-                                                       onchange="updateSlideStatus(<?php echo $index; ?>, this.checked)"
-                                                       <?php echo $carousel_data['statuses'][$index] == 'active' ? 'checked' : ''; ?>>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <button class="btn btn-sm btn-primary" onclick="editSlide(<?php echo $index; ?>)">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-danger" onclick="deleteSlide(<?php echo $index; ?>)">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
+    'titles' => isset($settings['carousel_titles']) ? json_decode($settings['carousel_titles'], true) : [],
+    'descriptions' => isset($settings['carousel_descriptions']) ? json_decode($settings['carousel_descriptions'], true) : [],
+    'links' => isset($settings['carousel_links']) ? json_decode($settings['carousel_links'], true) : [],
+    'images' => isset($settings['carousel_images']) ? json_decode($settings['carousel_images'], true) : [],
+    'statuses' => isset($settings['carousel_statuses']) ? json_decode($settings['carousel_statuses'], true) : []
+];
+
+// Tekshirish uchun qo'shimcha shart
+if (is_array($carousel_data['images'])) {
+    foreach($carousel_data['images'] as $index => $image): ?>
+        <tr>
+            <td>
+                <img src="../uploads/<?php echo htmlspecialchars($image); ?>" alt="Slide" 
+                     style="height: 50px; object-fit: cover;">
+            </td>
+            <td>
+                <?php echo htmlspecialchars($carousel_data['titles'][$index] ?? ''); ?>
+            </td>
+            <td>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" 
+                           onchange="updateSlideStatus(<?php echo $index; ?>, this.checked)"
+                           <?php echo ($carousel_data['statuses'][$index] ?? '') == 'active' ? 'checked' : ''; ?>>
+                </div>
+            </td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="editSlide(<?php echo $index; ?>)">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteSlide(<?php echo $index; ?>)">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        </tr>
+    <?php endforeach;
+} else {
+    echo '<tr><td colspan="4" class="text-center">Hozircha slaydlar yo\'q</td></tr>';
+}
+?>
                             </tbody>
                         </table>
                     </div>
